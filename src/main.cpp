@@ -366,9 +366,12 @@ void render() {
 
   const glm::mat4 viewMatrix = g_camera.computeViewMatrix();
   const glm::mat4 projMatrix = g_camera.computeProjectionMatrix();
+  const glm::vec3 camPosition = g_camera.getPosition();
 
   glUniformMatrix4fv(glGetUniformLocation(g_program, "viewMat"), 1, GL_FALSE, glm::value_ptr(viewMatrix)); // compute the view matrix of the camera and pass it to the GPU program
   glUniformMatrix4fv(glGetUniformLocation(g_program, "projMat"), 1, GL_FALSE, glm::value_ptr(projMatrix)); // compute the projection matrix of the camera and pass it to the GPU program
+  // for phong lightning
+  glUniform3f(glGetUniformLocation(g_program, "camPos"), camPosition[0], camPosition[1], camPosition[2]);
 
   /*uncomment for triangle
   glBindVertexArray(g_vao);     // activate the VAO storing geometry data
