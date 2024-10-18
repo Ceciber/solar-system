@@ -1,8 +1,9 @@
 #version 330 core
+in vec3 vertexColor; // Colore del vertice passato dal vertex shader
 
-in vec3 fNormal;  // Interpolated normal from the vertex shader
-out vec4 finalColor;  // Final output color
+out vec4 FragColor;  // Colore finale
 
-void main() {
-    finalColor = vec4(normalize(fNormal), 1.0);  // Normalize and display the normal as color
+void main()
+{
+    FragColor = vec4(vertexColor, 1.0); // Applichiamo il colore
 }

@@ -344,7 +344,7 @@ void init() {
   */
 
   // for the initialization of the sphere
-  sphereMesh = Mesh::genSphere(16); // Create a sphere mesh
+  sphereMesh = Mesh::genSphere(32); // Create a sphere mesh
   sphereMesh->init(); // Initialize its GPU buffers
 
   initGPUprogram(); // load and link the shaders

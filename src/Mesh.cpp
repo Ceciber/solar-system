@@ -4,49 +4,62 @@
 
 std::shared_ptr<Mesh> Mesh::genSphere(const size_t resolution) {
     auto mesh = std::make_shared<Mesh>();
-    
+
     const float PI = 3.14159265359f;
-    const float stepTheta = PI / resolution;  // Step for latitude
-    const float stepPhi = 2.0f * PI / resolution;  // Step for longitude
+    const float radius = 1.0f; // Sfera unitaria
 
-    // Generate vertices and normals. We generate vertices using spherical coordinates
-    for (size_t i = 0; i <= resolution; ++i) {
-        float theta = i * stepTheta; // from 0 to PI (latitude)
+    size_t sectorCount = resolution;
+    size_t stackCount = resolution;
 
-        for (size_t j = 0; j <= resolution; ++j) {
-            float phi = j * stepPhi; // from 0 to 2*PI (longitude)
+    // Step degli angoli
+    float sectorStep = 2 * PI / sectorCount;
+    float stackStep = PI / stackCount;
 
-            // Spherical to Cartesian conversion (we consider radius = 1)
-            float x = sin(theta) * cos(phi);
-            float y = cos(theta);
-            float z = sin(theta) * sin(phi);
+    // Genera i vertici e le normali
+    for(size_t i = 0; i <= stackCount; ++i) {
+        float stackAngle = PI / 2 - i * stackStep; // Da pi/2 a -pi/2
+        float xy = radius * cosf(stackAngle);      // r * cos(phi)
+        float z = radius * sinf(stackAngle);       // r * sin(phi)
 
-            // Push the vertex position (unit sphere, so radius is 1)
+        for(size_t j = 0; j <= sectorCount; ++j) {
+            float sectorAngle = j * sectorStep;    // Da 0 a 2pi
+
+            // Posizione del vertice (coordinate cartesiane)
+            float x = xy * cosf(sectorAngle);
+            float y = xy * sinf(sectorAngle);
             mesh->m_vertexPositions.push_back(x);
             mesh->m_vertexPositions.push_back(y);
             mesh->m_vertexPositions.push_back(z);
 
-            // Normals for a unit sphere are the same as the positions
-            mesh->m_vertexNormals.push_back(x);
-            mesh->m_vertexNormals.push_back(y);
-            mesh->m_vertexNormals.push_back(z);
+            // Normale del vertice
+            float nx = x / radius;
+            float ny = y / radius;
+            float nz = z / radius;
+            mesh->m_vertexNormals.push_back(nx);
+            mesh->m_vertexNormals.push_back(ny);
+            mesh->m_vertexNormals.push_back(nz);
         }
     }
 
-    // Generate indices for how the vertices are connected to form triangles.
-    for (size_t i = 0; i < resolution; ++i) {
-        for (size_t j = 0; j < resolution; ++j) {
-            unsigned int first = i * (resolution + 1) + j;
-            unsigned int second = first + resolution + 1;
+    // Genera gli indici per i triangoli
+    for(size_t i = 0; i < stackCount; ++i) {
+        size_t k1 = i * (sectorCount + 1); // indice della riga corrente
+        size_t k2 = k1 + sectorCount + 1;  // indice della riga successiva
 
-            // Two triangles per quad
-            mesh->m_triangleIndices.push_back(first);
-            mesh->m_triangleIndices.push_back(second);
-            mesh->m_triangleIndices.push_back(first + 1);
+        for(size_t j = 0; j < sectorCount; ++j, ++k1, ++k2) {
+            if(i != 0) {
+                // Primo triangolo
+                mesh->m_triangleIndices.push_back(k1);
+                mesh->m_triangleIndices.push_back(k2);
+                mesh->m_triangleIndices.push_back(k1 + 1);
+            }
 
-            mesh->m_triangleIndices.push_back(second);
-            mesh->m_triangleIndices.push_back(second + 1);
-            mesh->m_triangleIndices.push_back(first + 1);
+            if(i != (stackCount - 1)) {
+                // Secondo triangolo
+                mesh->m_triangleIndices.push_back(k1 + 1);
+                mesh->m_triangleIndices.push_back(k2);
+                mesh->m_triangleIndices.push_back(k2 + 1);
+            }
         }
     }
 
@@ -57,36 +70,41 @@ std::shared_ptr<Mesh> Mesh::genSphere(const size_t resolution) {
 buffers are associated with a VAO (Vertex Array Object), which keeps track of which vertex attributes (positions, normals, 
 texture coordinates, etc.) are stored in which buffers. */
 void Mesh::init() {
-    // Create and bind a VAO (Vertex Array Object)
+    // Genera i buffer
     glGenVertexArrays(1, &m_vao);
+    glGenBuffers(1, &m_posVbo);
+    glGenBuffers(1, &m_normalVbo);
+    glGenBuffers(1, &m_ibo);
+
+    // Bind del VAO
     glBindVertexArray(m_vao);
 
-    // Vertex positions (VBO)
-    glGenBuffers(1, &m_posVbo);
+    // Posizioni dei vertici
     glBindBuffer(GL_ARRAY_BUFFER, m_posVbo);
     glBufferData(GL_ARRAY_BUFFER, m_vertexPositions.size() * sizeof(float), m_vertexPositions.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0); // Layout (location = 0)
     glEnableVertexAttribArray(0);
 
-    // Vertex normals (VBO)
-    glGenBuffers(1, &m_normalVbo);
+    // Normali
     glBindBuffer(GL_ARRAY_BUFFER, m_normalVbo);
     glBufferData(GL_ARRAY_BUFFER, m_vertexNormals.size() * sizeof(float), m_vertexNormals.data(), GL_STATIC_DRAW);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, nullptr);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0); // Layout (location = 1)
     glEnableVertexAttribArray(1);
 
-    // Index buffer (IBO)
-    glGenBuffers(1, &m_ibo);
+    // Indici
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ibo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, m_triangleIndices.size() * sizeof(unsigned int), m_triangleIndices.data(), GL_STATIC_DRAW);
 
-
-    glBindVertexArray(0); // Unbind the VAO
+    // Unbind del VAO
+    glBindVertexArray(0);
 }
 
 void Mesh::render() {
-    glBindVertexArray(m_vao); // Bind VAO that stores the buffers
-    glDrawElements(GL_TRIANGLES, m_triangleIndices.size(), GL_UNSIGNED_INT, nullptr); // Draw the sphere
-    glBindVertexArray(0); // Unbind VAO after rendering
+    glBindVertexArray(m_vao);  // Bind del VAO
+
+    // Disegna la mesh usando gli indici (IBO)
+    glDrawElements(GL_TRIANGLES, m_triangleIndices.size(), GL_UNSIGNED_INT, 0);
+
+    glBindVertexArray(0);  // Unbind del VAO
 }
 
