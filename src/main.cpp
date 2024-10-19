@@ -62,8 +62,11 @@ std::vector<float> g_vertexPositions;
 std::vector<unsigned int> g_triangleIndices;
 // create a new vector for the colors
 std::vector<float> g_vertexColors;
-// create a new vector for the mesh
+
+// we need to create a vector for every mesh we need
 std::shared_ptr<Mesh> sphereMesh;
+std::shared_ptr<Mesh> earth;
+std::shared_ptr<Mesh> moon;
 
 
 // Basic camera model
@@ -210,7 +213,6 @@ void loadShader(GLuint program, GLenum type, const std::string &shaderFilename) 
     }
 
     const GLchar *shaderSource = (const GLchar *)shaderSourceString.c_str(); // C pointer to the source
-    std::cout << "Shader code for " << shaderFilename << ":\n" << shaderSourceString << std::endl; // Print shader source
 
     glShaderSource(shader, 1, &shaderSource, NULL); // Load the shader code
     glCompileShader(shader);
@@ -329,9 +331,10 @@ void initCamera() {
   glfwGetWindowSize(g_window, &width, &height);
   g_camera.setAspectRatio(static_cast<float>(width)/static_cast<float>(height));
 
-  g_camera.setPosition(glm::vec3(0.0, 0.0, 3.0));
+  // we adjust the position of the camera so that it's further from the elements (before it was very close to the sun which had size 1)
+  g_camera.setPosition(glm::vec3(0.0, 0.0, 20.0));
   g_camera.setNear(0.1);
-  g_camera.setFar(80.1);
+  g_camera.setFar(80.1); 
 }
 
 void init() {
@@ -343,9 +346,10 @@ void init() {
   initGPUgeometry();
   */
 
-  // for the initialization of the sphere
-  sphereMesh = Mesh::genSphere(32); // Create a sphere mesh
-  sphereMesh->init(); // Initialize its GPU buffers
+  sphereMesh = Mesh::genSphere(32);   // Crea la mesh per il Sole
+
+  // Inizializza le GPU buffers per ogni mesh
+  sphereMesh->init();
 
   initGPUprogram(); // load and link the shaders
 
@@ -362,26 +366,59 @@ void clear() {
 
 // The main rendering call
 void render() {
-  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Erase the color and z buffers.
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-  const glm::mat4 viewMatrix = g_camera.computeViewMatrix();
-  const glm::mat4 projMatrix = g_camera.computeProjectionMatrix();
-  const glm::vec3 camPosition = g_camera.getPosition();
+    const glm::mat4 viewMatrix = g_camera.computeViewMatrix();
+    const glm::mat4 projMatrix = g_camera.computeProjectionMatrix();
+    const glm::vec3 camPosition = g_camera.getPosition();
 
-  glUniformMatrix4fv(glGetUniformLocation(g_program, "viewMat"), 1, GL_FALSE, glm::value_ptr(viewMatrix)); // compute the view matrix of the camera and pass it to the GPU program
-  glUniformMatrix4fv(glGetUniformLocation(g_program, "projMat"), 1, GL_FALSE, glm::value_ptr(projMatrix)); // compute the projection matrix of the camera and pass it to the GPU program
-  // for phong lightning
-  glUniform3f(glGetUniformLocation(g_program, "camPos"), camPosition[0], camPosition[1], camPosition[2]);
+    glUniformMatrix4fv(glGetUniformLocation(g_program, "viewMat"), 1, GL_FALSE, glm::value_ptr(viewMatrix));
+    glUniformMatrix4fv(glGetUniformLocation(g_program, "projMat"), 1, GL_FALSE, glm::value_ptr(projMatrix));
 
-  /*uncomment for triangle
-  glBindVertexArray(g_vao);     // activate the VAO storing geometry data
-  glDrawElements(GL_TRIANGLES, g_triangleIndices.size(), GL_UNSIGNED_INT, 0); // Call for rendering: stream the current GPU geometry through the current GPU program
-  */
+    // Posizione della luce (Sole) e della camera
+    glm::vec3 lightPos = glm::vec3(0.0f); // Il Sole è all'origine
+    glUniform3fv(glGetUniformLocation(g_program, "lightPos"), 1, glm::value_ptr(lightPos));
+    glUniform3fv(glGetUniformLocation(g_program, "viewPos"), 1, glm::value_ptr(camPosition));
 
-  sphereMesh->render(); // Render the sphere
+    // shininess of the material
+    glUniform1f(glGetUniformLocation(g_program, "shininess"), 16.0f);
 
+    // --- Renderizza il Sole ---
+    glm::mat4 modelMatrixSun = glm::mat4(1.0f);
+    modelMatrixSun = glm::scale(modelMatrixSun, glm::vec3(kSizeSun));
+    glUniformMatrix4fv(glGetUniformLocation(g_program, "model"), 1, GL_FALSE, glm::value_ptr(modelMatrixSun));
 
+    // Colore giallo per il Sole
+    glUniform3f(glGetUniformLocation(g_program, "objectColor"), 1.0f, 1.0f, 0.0f);
+    glUniform3f(glGetUniformLocation(g_program, "ambientColor"), 1.0f, 1.0f, 0.0f); // Giallo per la luce ambientale
+    glUniform3f(glGetUniformLocation(g_program, "lightColor"), 1.0f, 1.0f, 1.0f);  // Luce bianca
+
+    // Setta isSun a true per il Sole
+    glUniform1i(glGetUniformLocation(g_program, "isSun"), 1);
+    sphereMesh->render();
+
+    // --- Renderizza la Terra ---
+    glm::mat4 modelMatrixEarth = glm::mat4(1.0f);
+    modelMatrixEarth = glm::translate(modelMatrixEarth, glm::vec3(kRadOrbitEarth, 0.0f, 0.0f));
+    modelMatrixEarth = glm::scale(modelMatrixEarth, glm::vec3(kSizeEarth));
+    glUniformMatrix4fv(glGetUniformLocation(g_program, "model"), 1, GL_FALSE, glm::value_ptr(modelMatrixEarth));
+
+    glUniform3f(glGetUniformLocation(g_program, "objectColor"), 0.0f, 1.0f, 0.0f); // greenish color
+    glUniform3f(glGetUniformLocation(g_program, "ambientColor"), 0.1f, 0.1f, 0.1f); // Una leggera componente ambientale
+    glUniform1i(glGetUniformLocation(g_program, "isSun"), 0);  // Non è il Sole
+    sphereMesh->render();
+
+    // --- Renderizza la Luna ---
+    glm::mat4 modelMatrixMoon = glm::mat4(1.0f);
+    modelMatrixMoon = glm::translate(modelMatrixMoon, glm::vec3(kRadOrbitEarth + kRadOrbitMoon, 0.0f, 0.0f));
+    modelMatrixMoon = glm::scale(modelMatrixMoon, glm::vec3(kSizeMoon));
+    glUniformMatrix4fv(glGetUniformLocation(g_program, "model"), 1, GL_FALSE, glm::value_ptr(modelMatrixMoon));
+
+    glUniform3f(glGetUniformLocation(g_program, "objectColor"), 0.0f, 0.0f, 1.0f); // bluish color
+    glUniform1i(glGetUniformLocation(g_program, "isSun"), 0);  // Non è il Sole
+    sphereMesh->render();
 }
+
 
 // Update any accessible variable based on the current time
 void update(const float currentTimeInSec) {

@@ -1,45 +1,36 @@
 #version 330 core
 
-in vec3 fPosition; // fragment's position
-in vec3 fNormal;  // Normale interpolata del frammento
+in vec3 fPosition;  // Posizione del frammento nel mondo
+in vec3 fNormal;    // Normale interpolata dal vertex shader
 
-// for the Phong lighting
-uniform vec3 camPos; // Posizione della camera (osservatore)
+uniform vec3 lightPos;    // Posizione della luce (Sole)
+uniform vec3 viewPos;     // Posizione della camera
+uniform vec3 lightColor;  // Colore della luce (il Sole)
+uniform vec3 ambientColor; // Colore della luce ambientale
+uniform vec3 objectColor; // Colore dell'oggetto
+uniform float shininess;  // Lucentezza del materiale
 
-out vec4 FragColor;  // Colore finale
+out vec4 FragColor;
 
 void main() {
-    // Normale normalizzata
-    vec3 n = normalize(fNormal);
+    // --- Componente ambientale ---
+    vec3 ambient = ambientColor * objectColor;
 
-    // Direzione della luce hardcoded (puoi cambiarla con una uniform in futuro)
-    vec3 l = normalize(vec3(1.0, 1.0, 0.0)); // Light direction vector
+    // --- Componente diffusa ---
+    vec3 norm = normalize(fNormal); // Normalizza la normale
+    vec3 lightDir = normalize(lightPos - fPosition); // Direzione della luce
+    float diff = max(dot(norm, lightDir), 0.0); // Calcola la luce diffusa
+    vec3 diffuse = diff * lightColor;
 
-    // TODO: vec3 v = calculate view vector
-    // Vettore verso la camera (osservatore)
-    vec3 v = normalize(camPos - fPosition);
+    // --- Componente speculare ---
+    vec3 viewDir = normalize(viewPos - fPosition); // Direzione dell'osservatore
+    vec3 reflectDir = reflect(-lightDir, norm); // Calcola il vettore riflesso
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); // Forza della luce speculare
+    vec3 specular = spec * lightColor; // Applica il colore della luce alla riflessione speculare
 
-    // TODO: vec3 r = calculate reflection vector
-    // Vettore di riflessione della luce rispetto alla normale
-    vec3 r = reflect(-l, n);
-
-    // TODO: vec3 ambient = set an ambient color
-    // Colore ambientale (valore costante)
-    vec3 ambient = vec3(0.1, 0.1, 0.1);  // Puoi regolare il livello di luce ambientale
-
-    // TODO: vec3 diffuse = calculate the diffuse lighting
-    // Calcolo della luce diffusa usando il modello di Lambert
-    float diffIntensity = max(dot(n, l), 0.0);
-    vec3 diffuse = vec3(0.8, 0.8, 0.8) * diffIntensity; // Colore diffuso (modifica a piacere)
-
-    // TODO: vec3 specular = calculate the specular lighting
-    // Calcolo della luce speculare con il modello Phong
-    float shininess = 32.0;  // Regola la brillantezza della superficie
-    float specIntensity = pow(max(dot(v, r), 0.0), shininess);
-    vec3 specular = vec3(1.0, 1.0, 1.0) * specIntensity; // Colore speculare (bianco)
-
-    // Colore finale combinato
-    vec3 finalColor = ambient + diffuse + specular;
-
-    FragColor = vec4(finalColor, 1.0); // RGBA finale
+    // Somma delle componenti di illuminazione
+    vec3 result = ambient + diffuse + specular;
+    FragColor = vec4(result * objectColor, 1.0); // Colora il frammento
 }
+
+
