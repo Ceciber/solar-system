@@ -1,36 +1,43 @@
 #version 330 core
 
-in vec3 fPosition;  // Posizione del frammento nel mondo
-in vec3 fNormal;    // Normale interpolata dal vertex shader
+in vec3 fPosition;  // Fragment position in world space
+in vec3 fNormal;    // Interpolated normal from vertex shader
 
-uniform vec3 lightPos;    // Posizione della luce (Sole)
-uniform vec3 viewPos;     // Posizione della camera
-uniform vec3 lightColor;  // Colore della luce (il Sole)
-uniform vec3 ambientColor; // Colore della luce ambientale
-uniform vec3 objectColor; // Colore dell'oggetto
-uniform float shininess;  // Lucentezza del materiale
+uniform vec3 lightPos;    // Light (Sun) position
+uniform vec3 viewPos;     // Camera position
+uniform vec3 lightColor;  // Light (Sun) color
+uniform vec3 ambientColor; // Ambient light color
+uniform vec3 objectColor; // Object's base color
+uniform float shininess;  // Material shininess
+uniform int isSun;        // Flag to differentiate Sun from other objects
 
 out vec4 FragColor;
 
 void main() {
-    // --- Componente ambientale ---
-    vec3 ambient = objectColor * ambientColor;
+    vec3 norm = normalize(fNormal);
+    vec3 lightDir = normalize(lightPos - fPosition);
+    vec3 viewDir = normalize(viewPos - fPosition);
 
-    // --- Componente diffusa ---
-    vec3 norm = normalize(fNormal); // Normalizza la normale
-    vec3 lightDir = normalize(lightPos - fPosition); // Direzione della luce
-    float diff = max(dot(norm, lightDir), 0.0); // Calcola la luce diffusa
+    vec3 ambient = ambientColor;  
+
+    // If the object is the Sun, use only its diffuse light
+    if (isSun == 1) {
+        FragColor = vec4(objectColor, 1.0);  // Just render Sun's base color
+        return;
+    }
+
+    // --- Diffuse lighting ---
+    float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * lightColor;
 
-    // --- Componente speculare ---
-    vec3 viewDir = normalize(viewPos - fPosition); // Direzione dell'osservatore
-    vec3 reflectDir = reflect(-lightDir, norm); // Calcola il vettore riflesso
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess); // Forza della luce speculare
-    vec3 specular = spec * lightColor; // Applica il colore della luce alla riflessione speculare
+    // --- Specular lighting ---
+    vec3 reflectDir = reflect(-lightDir, norm);  // Reflected light direction
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), shininess);  // Specular strength
+    vec3 specular = spec * lightColor;
 
-    // Somma delle componenti di illuminazione
+    // Final color combination
     vec3 result = ambient + diffuse + specular;
-    FragColor = vec4(result * objectColor, 1.0); // Colora il frammento
+    FragColor = vec4(result * objectColor, 1.0);
 }
 
 

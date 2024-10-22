@@ -382,8 +382,12 @@ void render() {
     glUniform3fv(glGetUniformLocation(g_program, "lightPos"), 1, glm::value_ptr(lightPos));
     glUniform3fv(glGetUniformLocation(g_program, "viewPos"), 1, glm::value_ptr(camPosition));
 
+    // Single global ambient color (e.g., dim gray light)
+    glm::vec3 ambientLightColor = glm::vec3(0.1f, 0.1f, 0.1f);
+    glUniform3fv(glGetUniformLocation(g_program, "ambientColor"), 1, glm::value_ptr(ambientLightColor));
+
     // shininess of the material
-    glUniform1f(glGetUniformLocation(g_program, "shininess"), 100.0f);
+    glUniform1f(glGetUniformLocation(g_program, "shininess"), 32.0f);
 
     // --- Renderizza il Sole ---
     modelMatrixSun = glm::scale(modelMatrixSun, glm::vec3(kSizeSun));
@@ -391,30 +395,24 @@ void render() {
 
     // Colore giallo per il Sole
     glUniform3f(glGetUniformLocation(g_program, "objectColor"), 1.0f, 1.0f, 0.0f);
-    glUniform3f(glGetUniformLocation(g_program, "ambientColor"), 1.0f, 1.0f, 0.0f);
-    glUniform3f(glGetUniformLocation(g_program, "lightColor"), 1.0f, 1.0f, 1.0f);  // Luce bianca
+    glUniform3f(glGetUniformLocation(g_program, "lightColor"), 1.0f, 1.0f, 1.0f); 
 
     // Setta isSun a true per il Sole
     glUniform1i(glGetUniformLocation(g_program, "isSun"), 1);
     sphereMesh->render();
 
     // --- Renderizza la Terra ---
-    /*modelMatrixEarth = glm::translate(modelMatrixEarth, glm::vec3(kRadOrbitEarth, 0.0f, 0.0f));
-    modelMatrixEarth = glm::scale(modelMatrixEarth, glm::vec3(kSizeEarth));*/
     glUniformMatrix4fv(glGetUniformLocation(g_program, "model"), 1, GL_FALSE, glm::value_ptr(modelMatrixEarth));
 
-    glUniform3f(glGetUniformLocation(g_program, "objectColor"), 0.0f, 1.0f, 0.0f); // greenish color
-    glUniform3f(glGetUniformLocation(g_program, "ambientColor"), 0.1f, 0.1f, 0.1f); 
-    glUniform1i(glGetUniformLocation(g_program, "isSun"), 0);  // Non è il Sole
+    glUniform3f(glGetUniformLocation(g_program, "objectColor"), 0.0f, 1.0f, 0.0f);  
+    glUniform1i(glGetUniformLocation(g_program, "isSun"), 0); 
     sphereMesh->render();
 
     // --- Renderizza la Luna ---
-    /*modelMatrixMoon = glm::translate(modelMatrixMoon, glm::vec3(kRadOrbitEarth + kRadOrbitMoon, 0.0f, 0.0f));
-    modelMatrixMoon = glm::scale(modelMatrixMoon, glm::vec3(kSizeMoon)); */
     glUniformMatrix4fv(glGetUniformLocation(g_program, "model"), 1, GL_FALSE, glm::value_ptr(modelMatrixMoon));
 
-    glUniform3f(glGetUniformLocation(g_program, "objectColor"), 0.0f, 0.0f, 1.0f); // bluish color
-    glUniform1i(glGetUniformLocation(g_program, "isSun"), 0);  // Non è il Sole
+    glUniform3f(glGetUniformLocation(g_program, "objectColor"), 0.0f, 0.0f, 1.0f);
+    glUniform1i(glGetUniformLocation(g_program, "isSun"), 0); 
     sphereMesh->render();
 }  
 
