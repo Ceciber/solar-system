@@ -63,11 +63,13 @@ std::vector<unsigned int> g_triangleIndices;
 // create a new vector for the colors
 std::vector<float> g_vertexColors;
 
-// we need to create a vector for every mesh we need
+// we need to create a vector for the mesh
 std::shared_ptr<Mesh> sphereMesh;
-std::shared_ptr<Mesh> earth;
-std::shared_ptr<Mesh> moon;
 
+//variables for the planets matrices
+glm::mat4 modelMatrixSun = glm::mat4(1.0f);
+glm::mat4 modelMatrixEarth = glm::mat4(1.0f);
+glm::mat4 modelMatrixMoon = glm::mat4(1.0f);
 
 // Basic camera model
 class Camera {
@@ -381,16 +383,15 @@ void render() {
     glUniform3fv(glGetUniformLocation(g_program, "viewPos"), 1, glm::value_ptr(camPosition));
 
     // shininess of the material
-    glUniform1f(glGetUniformLocation(g_program, "shininess"), 16.0f);
+    glUniform1f(glGetUniformLocation(g_program, "shininess"), 100.0f);
 
     // --- Renderizza il Sole ---
-    glm::mat4 modelMatrixSun = glm::mat4(1.0f);
     modelMatrixSun = glm::scale(modelMatrixSun, glm::vec3(kSizeSun));
     glUniformMatrix4fv(glGetUniformLocation(g_program, "model"), 1, GL_FALSE, glm::value_ptr(modelMatrixSun));
 
     // Colore giallo per il Sole
     glUniform3f(glGetUniformLocation(g_program, "objectColor"), 1.0f, 1.0f, 0.0f);
-    glUniform3f(glGetUniformLocation(g_program, "ambientColor"), 1.0f, 1.0f, 0.0f); // Giallo per la luce ambientale
+    glUniform3f(glGetUniformLocation(g_program, "ambientColor"), 1.0f, 1.0f, 0.0f);
     glUniform3f(glGetUniformLocation(g_program, "lightColor"), 1.0f, 1.0f, 1.0f);  // Luce bianca
 
     // Setta isSun a true per il Sole
@@ -398,33 +399,60 @@ void render() {
     sphereMesh->render();
 
     // --- Renderizza la Terra ---
-    glm::mat4 modelMatrixEarth = glm::mat4(1.0f);
-    modelMatrixEarth = glm::translate(modelMatrixEarth, glm::vec3(kRadOrbitEarth, 0.0f, 0.0f));
-    modelMatrixEarth = glm::scale(modelMatrixEarth, glm::vec3(kSizeEarth));
+    /*modelMatrixEarth = glm::translate(modelMatrixEarth, glm::vec3(kRadOrbitEarth, 0.0f, 0.0f));
+    modelMatrixEarth = glm::scale(modelMatrixEarth, glm::vec3(kSizeEarth));*/
     glUniformMatrix4fv(glGetUniformLocation(g_program, "model"), 1, GL_FALSE, glm::value_ptr(modelMatrixEarth));
 
     glUniform3f(glGetUniformLocation(g_program, "objectColor"), 0.0f, 1.0f, 0.0f); // greenish color
-    glUniform3f(glGetUniformLocation(g_program, "ambientColor"), 0.1f, 0.1f, 0.1f); // Una leggera componente ambientale
+    glUniform3f(glGetUniformLocation(g_program, "ambientColor"), 0.1f, 0.1f, 0.1f); 
     glUniform1i(glGetUniformLocation(g_program, "isSun"), 0);  // Non è il Sole
     sphereMesh->render();
 
     // --- Renderizza la Luna ---
-    glm::mat4 modelMatrixMoon = glm::mat4(1.0f);
-    modelMatrixMoon = glm::translate(modelMatrixMoon, glm::vec3(kRadOrbitEarth + kRadOrbitMoon, 0.0f, 0.0f));
-    modelMatrixMoon = glm::scale(modelMatrixMoon, glm::vec3(kSizeMoon));
+    /*modelMatrixMoon = glm::translate(modelMatrixMoon, glm::vec3(kRadOrbitEarth + kRadOrbitMoon, 0.0f, 0.0f));
+    modelMatrixMoon = glm::scale(modelMatrixMoon, glm::vec3(kSizeMoon)); */
     glUniformMatrix4fv(glGetUniformLocation(g_program, "model"), 1, GL_FALSE, glm::value_ptr(modelMatrixMoon));
 
     glUniform3f(glGetUniformLocation(g_program, "objectColor"), 0.0f, 0.0f, 1.0f); // bluish color
     glUniform1i(glGetUniformLocation(g_program, "isSun"), 0);  // Non è il Sole
     sphereMesh->render();
-}
+}  
 
-
-// Update any accessible variable based on the current time
+// Update function to compute the orbital positions and rotations based on time
 void update(const float currentTimeInSec) {
-  // std::cout << currentTimeInSec << std::endl;
+    // std::cout << currentTimeInSec << std::endl;
 
+    // Define the periods for Earth and Moon
+    const float T_rot = 10.0f; // Earth rotation period (adjust to suit)
+    const float T_orbitEarth = 2 * T_rot; // Earth's orbital period
+    const float T_orbitMoon = 0.5f * T_rot; // Moon's orbital period (also its rotation period)
+
+    // Calculate the Earth's position around the Sun
+    float earthOrbitAngle = 2.0f * M_PI * (currentTimeInSec / T_orbitEarth); // angle in radians
+    float earthPosX = kRadOrbitEarth * cos(earthOrbitAngle); // x position of Earth in orbit
+    float earthPosZ = kRadOrbitEarth * sin(earthOrbitAngle); // z position of Earth in orbit
+
+    // Calculate the Earth's rotation around its axis
+    float earthRotationAngle = 2.0f * M_PI * (currentTimeInSec / T_rot); // angle in radians
+
+    // Calculate the Moon's position around the Earth
+    float moonOrbitAngle = 2.0f * M_PI * (currentTimeInSec / T_orbitMoon); // angle in radians
+    float moonPosX = earthPosX + kRadOrbitMoon * cos(moonOrbitAngle); // x position of Moon in orbit
+    float moonPosZ = earthPosZ + kRadOrbitMoon * sin(moonOrbitAngle); // z position of Moon in orbit
+
+    // Calculate the Moon's rotation (same as its orbit angle to keep the same face towards Earth)
+    float moonRotationAngle = moonOrbitAngle;
+
+    // Update model matrices (to be used in the render function)
+    modelMatrixEarth = glm::translate(glm::mat4(1.0f), glm::vec3(earthPosX, 0.0f, earthPosZ));
+    modelMatrixEarth = glm::rotate(modelMatrixEarth, earthRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+    modelMatrixEarth = glm::scale(modelMatrixEarth, glm::vec3(kSizeEarth));
+
+    modelMatrixMoon = glm::translate(glm::mat4(1.0f), glm::vec3(moonPosX, 0.0f, moonPosZ));
+    modelMatrixMoon = glm::rotate(modelMatrixMoon, moonRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+    modelMatrixMoon = glm::scale(modelMatrixMoon, glm::vec3(kSizeMoon));
 }
+
 
 int main(int argc, char ** argv) {
   init(); // Your initialization code (user interface, OpenGL states, scene with geometry, material, lights, etc)

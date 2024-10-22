@@ -14,7 +14,7 @@ out vec4 FragColor;
 
 void main() {
     // --- Componente ambientale ---
-    vec3 ambient = ambientColor * objectColor;
+    vec3 ambient = objectColor * ambientColor;
 
     // --- Componente diffusa ---
     vec3 norm = normalize(fNormal); // Normalizza la normale
