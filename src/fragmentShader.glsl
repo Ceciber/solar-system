@@ -2,6 +2,7 @@
 
 in vec3 fPosition;  // Fragment position in world space
 in vec3 fNormal;    // Interpolated normal from vertex shader
+in vec2 fTexCoord;
 
 uniform vec3 lightPos;    // Light (Sun) position
 uniform vec3 viewPos;     // Camera position
@@ -11,6 +12,12 @@ uniform vec3 objectColor; // Object's base color
 uniform float shininess;  // Material shininess
 uniform int isSun;        // Flag to differentiate Sun from other objects
 
+struct Material {
+    sampler2D albedoTex;
+};
+
+uniform Material material;
+
 out vec4 FragColor;
 
 void main() {
@@ -18,7 +25,9 @@ void main() {
     vec3 lightDir = normalize(lightPos - fPosition);
     vec3 viewDir = normalize(viewPos - fPosition);
 
-    vec3 ambient = ambientColor;  
+    vec3 ambient = ambientColor; 
+
+    vec3 texColor = texture(material.albedoTex, fTexCoord).rgb; 
 
     // If the object is the Sun, use only its diffuse light
     if (isSun == 1) {
@@ -37,7 +46,7 @@ void main() {
 
     // Final color combination
     vec3 result = ambient + diffuse + specular;
-    FragColor = vec4(result * objectColor, 1.0);
-}
+    FragColor = vec4(texColor * result, 1.0);
 
+}
 

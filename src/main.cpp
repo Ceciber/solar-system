@@ -56,6 +56,9 @@ GLuint g_posVbo = 0;
 GLuint g_ibo = 0;
 GLuint g_colorVbo = 0;
 
+GLuint g_earthTexID;
+GLuint g_moonTexID;
+
 // All vertex positions packed in one array [x0, y0, z0, x1, y1, z1, ...]
 std::vector<float> g_vertexPositions;
 // All triangle indices packed in one array [v00, v01, v02, v10, v11, v12, ...] with vij the index of j-th vertex of the i-th triangle
@@ -104,23 +107,34 @@ private:
 Camera g_camera;
 
 GLuint loadTextureFromFileToGPU(const std::string &filename) {
-  int width, height, numComponents;
+  
+  stbi_set_flip_vertically_on_load(true);
   // Loading the image in CPU memory using stb_image
-  unsigned char *data = stbi_load(
-    filename.c_str(),
-    &width, &height,
-    &numComponents, // 1 for a 8 bit grey-scale image, 3 for 24bits RGB image, 4 for 32bits RGBA image
-    0);
+  int width, height, numComponents;
 
-  GLuint texID;
-  // TODO: create a texture and upload the image data in GPU memory using
-  // glGenTextures, glBindTexture, glTexParameteri, and glTexImage2D
-
+  unsigned char *data = stbi_load(filename.c_str(), &width, &height, &numComponents, 0);
+  GLuint texID; // OpenGL texture identifier
+  glGenTextures(1, &texID); // generate an OpenGL texture container
+  glBindTexture(GL_TEXTURE_2D, texID); // activate the texture
+  // Setup the texture filtering option and repeat mode; check www.opengl.org for details.
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+  // Fill the GPU texture with the data stored in the CPU image
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
   // Free useless CPU memory
   stbi_image_free(data);
   glBindTexture(GL_TEXTURE_2D, 0); // unbind the texture
-
+  
   return texID;
+}
+
+void checkOpenGLError(const std::string& message) {
+    GLenum err;
+    while ((err = glGetError()) != GL_NO_ERROR) {
+        std::cerr << "OpenGL error (" << message << "): " << err << std::endl;
+    }
 }
 
 // Executed each time the window is resized. Adjust the aspect ratio and the rendering viewport to the current window.
@@ -218,13 +232,17 @@ void loadShader(GLuint program, GLenum type, const std::string &shaderFilename) 
 
     glShaderSource(shader, 1, &shaderSource, NULL); // Load the shader code
     glCompileShader(shader);
+    
+    // Check if shader compilation was successful
     GLint success;
     GLchar infoLog[512];
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
     if (!success) {
         glGetShaderInfoLog(shader, 512, NULL, infoLog);
-        std::cout << "ERROR in compiling " << shaderFilename << "\n\t" << infoLog << std::endl;
+        std::cerr << "ERROR in compiling " << shaderFilename << "\n\t" << infoLog << std::endl;
     }
+
+    checkOpenGLError("Shader attach");
 
     glAttachShader(program, shader);
     glDeleteShader(shader);
@@ -245,9 +263,15 @@ void initGPUprogram() {
       glGetProgramInfoLog(g_program, 512, NULL, infoLog);
       std::cerr << "ERROR: Shader program linking failed\n" << infoLog << std::endl;
   }
+  checkOpenGLError("Program linking"); // Error check after linking
 
   glUseProgram(g_program);
-  // TODO: set shader variables, textures, etc.
+  checkOpenGLError("Program use"); // Error check after linking
+
+  g_earthTexID = loadTextureFromFileToGPU("D:\\IGR\\TP00-OpenGL\\src\\media\\earth.jpg");
+  g_moonTexID = loadTextureFromFileToGPU("D:\\IGR\\TP00-OpenGL\\src\\media\\moon.jpg");
+  glUniform1i(glGetUniformLocation(g_program, "material.albedoTex"), 0);
+  checkOpenGLError("Uniform setup"); // Error check after setting uniform
 }
 
 // Define your mesh(es) in the CPU memory
@@ -383,7 +407,7 @@ void render() {
     glUniform3fv(glGetUniformLocation(g_program, "viewPos"), 1, glm::value_ptr(camPosition));
 
     // Single global ambient color (e.g., dim gray light)
-    glm::vec3 ambientLightColor = glm::vec3(0.1f, 0.1f, 0.1f);
+    glm::vec3 ambientLightColor = glm::vec3(0.4f, 0.4f, 0.4f);
     glUniform3fv(glGetUniformLocation(g_program, "ambientColor"), 1, glm::value_ptr(ambientLightColor));
 
     // shininess of the material
@@ -406,6 +430,10 @@ void render() {
 
     glUniform3f(glGetUniformLocation(g_program, "objectColor"), 0.0f, 1.0f, 0.0f);  
     glUniform1i(glGetUniformLocation(g_program, "isSun"), 0); 
+
+    glActiveTexture(GL_TEXTURE0); // activate texture unit 0
+    glBindTexture(GL_TEXTURE_2D, g_earthTexID);
+
     sphereMesh->render();
 
     // --- Renderizza la Luna ---
@@ -413,6 +441,10 @@ void render() {
 
     glUniform3f(glGetUniformLocation(g_program, "objectColor"), 0.0f, 0.0f, 1.0f);
     glUniform1i(glGetUniformLocation(g_program, "isSun"), 0); 
+
+    glActiveTexture(GL_TEXTURE0); // activate texture unit 0
+    glBindTexture(GL_TEXTURE_2D, g_moonTexID);
+
     sphereMesh->render();
 }  
 
@@ -443,6 +475,7 @@ void update(const float currentTimeInSec) {
 
     // Update model matrices (to be used in the render function)
     modelMatrixEarth = glm::translate(glm::mat4(1.0f), glm::vec3(earthPosX, 0.0f, earthPosZ));
+    modelMatrixEarth = glm::rotate(modelMatrixEarth, glm::radians(23.5f), glm::vec3(1.0f, 0.0f, 0.0f)); // tilt rotation
     modelMatrixEarth = glm::rotate(modelMatrixEarth, earthRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
     modelMatrixEarth = glm::scale(modelMatrixEarth, glm::vec3(kSizeEarth));
 

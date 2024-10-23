@@ -2,6 +2,9 @@
 #include "Mesh.hpp"
 #include <cmath>
 
+#include <iostream>
+
+
 std::shared_ptr<Mesh> Mesh::genSphere(const size_t resolution) {
     auto mesh = std::make_shared<Mesh>();
 
@@ -20,6 +23,9 @@ std::shared_ptr<Mesh> Mesh::genSphere(const size_t resolution) {
         float stackAngle = PI / 2 - i * stackStep; // Da pi/2 a -pi/2
         float xy = radius * cosf(stackAngle);      // r * cos(phi)
         float z = radius * sinf(stackAngle);       // r * sin(phi)
+        
+        // Compute V texture coordinate (latitudinal angle)
+        float v = (float)i / stackCount; 
 
         for(size_t j = 0; j <= sectorCount; ++j) {
             float sectorAngle = j * sectorStep;    // Da 0 a 2pi
@@ -28,16 +34,23 @@ std::shared_ptr<Mesh> Mesh::genSphere(const size_t resolution) {
             float x = xy * cosf(sectorAngle);
             float y = xy * sinf(sectorAngle);
             mesh->m_vertexPositions.push_back(x);
+            mesh->m_vertexPositions.push_back(-z);
             mesh->m_vertexPositions.push_back(y);
-            mesh->m_vertexPositions.push_back(z);
 
             // Normale del vertice
             float nx = x / radius;
             float ny = y / radius;
             float nz = z / radius;
             mesh->m_vertexNormals.push_back(nx);
+            mesh->m_vertexNormals.push_back(-nz);
             mesh->m_vertexNormals.push_back(ny);
-            mesh->m_vertexNormals.push_back(nz);
+
+            // Compute U texture coordinate (longitudinal angle)
+            float u = (float)j / sectorCount; 
+
+            // Add texture coordinates (u, v)
+            mesh->m_vertexTexCoords.push_back(u);
+            mesh->m_vertexTexCoords.push_back(v);
         }
     }
 
@@ -75,6 +88,7 @@ void Mesh::init() {
     glGenBuffers(1, &m_posVbo);
     glGenBuffers(1, &m_normalVbo);
     glGenBuffers(1, &m_ibo);
+    glGenBuffers(1, &m_texCoordVbo);
 
     // Bind del VAO
     glBindVertexArray(m_vao);
@@ -90,6 +104,12 @@ void Mesh::init() {
     glBufferData(GL_ARRAY_BUFFER, m_vertexNormals.size() * sizeof(float), m_vertexNormals.data(), GL_STATIC_DRAW);
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0); // Layout (location = 1)
     glEnableVertexAttribArray(1);
+
+    // Texture coordinates
+    glBindBuffer(GL_ARRAY_BUFFER, m_texCoordVbo); // Bind the texture coordinate buffer
+    glBufferData(GL_ARRAY_BUFFER, m_vertexTexCoords.size() * sizeof(float), m_vertexTexCoords.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0); // Layout (location = 2)
+    glEnableVertexAttribArray(2);
 
     // Indici
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ibo);
