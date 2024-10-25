@@ -43,6 +43,11 @@ const static float kSizeEarth = 0.5;
 const static float kSizeMoon = 0.25;
 const static float kRadOrbitEarth = 10;
 const static float kRadOrbitMoon = 2;
+// add two planets for final step
+const static float kSizeMars = kSizeEarth * 0.53f;  // Mars is 53% of Earth's size
+const static float kSizeVenus = kSizeEarth * 0.95f; // Venus is 95% of Earth's size
+const static float kRadOrbitMars = kRadOrbitEarth * 1.52f;
+const static float kRadOrbitVenus = kRadOrbitEarth * 1.52f;
 
 // Window parameters
 GLFWwindow *g_window = nullptr;
@@ -58,6 +63,9 @@ GLuint g_colorVbo = 0;
 
 GLuint g_earthTexID;
 GLuint g_moonTexID;
+// add two planets for final step
+GLuint g_marsTexID;
+GLuint g_venusTexID;
 
 // All vertex positions packed in one array [x0, y0, z0, x1, y1, z1, ...]
 std::vector<float> g_vertexPositions;
@@ -73,6 +81,9 @@ std::shared_ptr<Mesh> sphereMesh;
 glm::mat4 modelMatrixSun = glm::mat4(1.0f);
 glm::mat4 modelMatrixEarth = glm::mat4(1.0f);
 glm::mat4 modelMatrixMoon = glm::mat4(1.0f);
+// add two planets for final step
+glm::mat4 modelMatrixMars = glm::mat4(1.0f);
+glm::mat4 modelMatrixVenus = glm::mat4(1.0f);
 
 // Basic camera model
 class Camera {
@@ -107,7 +118,7 @@ private:
 Camera g_camera;
 
 GLuint loadTextureFromFileToGPU(const std::string &filename) {
-  
+  // flip the axis or we see the planets upside down
   stbi_set_flip_vertically_on_load(true);
   // Loading the image in CPU memory using stb_image
   int width, height, numComponents;
@@ -143,15 +154,20 @@ void windowSizeCallback(GLFWwindow* window, int width, int height) {
   glViewport(0, 0, (GLint)width, (GLint)height); // Dimension of the rendering region in the window
 }
 
-// Executed each time a key is entered.
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
-  if(action == GLFW_PRESS && key == GLFW_KEY_W) {
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-  } else if(action == GLFW_PRESS && key == GLFW_KEY_F) {
-    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-  } else if(action == GLFW_PRESS && (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_Q)) {
-    glfwSetWindowShouldClose(window, true); // Closes the application if the escape key is pressed
-  }
+    if (action == GLFW_PRESS && key == GLFW_KEY_W) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    } else if (action == GLFW_PRESS && key == GLFW_KEY_F) {
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+    } else if (action == GLFW_PRESS && (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_Q)) {
+        glfwSetWindowShouldClose(window, true); // Closes the application if the escape key is pressed
+    } else if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_UP) {
+        const glm::vec3 camPosition = g_camera.getPosition();
+        g_camera.setPosition(glm::vec3(camPosition[0], camPosition[1], camPosition[2] - 0.1));
+    } else if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_DOWN) {
+        const glm::vec3 camPosition = g_camera.getPosition();
+        g_camera.setPosition(glm::vec3(camPosition[0], camPosition[1], camPosition[2] + 0.1));
+    }
 }
 
 void errorCallback(int error, const char *desc) {
@@ -203,7 +219,7 @@ void initOpenGL() {
   glEnable(GL_CULL_FACE); // Enables face culling (based on the orientation defined by the CW/CCW enumeration).
   glDepthFunc(GL_LESS);   // Specify the depth test for the z-buffer
   glEnable(GL_DEPTH_TEST);      // Enable the z-buffer test in the rasterization
-  glClearColor(0.7f, 0.7f, 0.7f, 1.0f); // specify the background color, used any time the framebuffer is cleared
+  glClearColor(0.0f, 0.0f, 0.0f, 1.0f); // specify the background color, used any time the framebuffer is cleared
 }
 
 // Loads the content of an ASCII file in a standard C++ string
@@ -270,6 +286,9 @@ void initGPUprogram() {
 
   g_earthTexID = loadTextureFromFileToGPU("D:\\IGR\\TP00-OpenGL\\src\\media\\earth.jpg");
   g_moonTexID = loadTextureFromFileToGPU("D:\\IGR\\TP00-OpenGL\\src\\media\\moon.jpg");
+  // add mars and venus textures
+  g_marsTexID = loadTextureFromFileToGPU("D:\\IGR\\TP00-OpenGL\\src\\media\\mars.jpg");
+  g_venusTexID = loadTextureFromFileToGPU("D:\\IGR\\TP00-OpenGL\\src\\media\\venus.jpg");
   glUniform1i(glGetUniformLocation(g_program, "material.albedoTex"), 0);
   checkOpenGLError("Uniform setup"); // Error check after setting uniform
 }
@@ -358,7 +377,7 @@ void initCamera() {
   g_camera.setAspectRatio(static_cast<float>(width)/static_cast<float>(height));
 
   // we adjust the position of the camera so that it's further from the elements (before it was very close to the sun which had size 1)
-  g_camera.setPosition(glm::vec3(0.0, 0.0, 20.0));
+  g_camera.setPosition(glm::vec3(0.0, 0.0, 25.0));
   g_camera.setNear(0.1);
   g_camera.setFar(80.1); 
 }
@@ -442,8 +461,27 @@ void render() {
     glUniform3f(glGetUniformLocation(g_program, "objectColor"), 0.0f, 0.0f, 1.0f);
     glUniform1i(glGetUniformLocation(g_program, "isSun"), 0); 
 
-    glActiveTexture(GL_TEXTURE0); // activate texture unit 0
+    glActiveTexture(GL_TEXTURE0); 
     glBindTexture(GL_TEXTURE_2D, g_moonTexID);
+
+    sphereMesh->render();
+
+    // rendering of the two added planets
+    glUniformMatrix4fv(glGetUniformLocation(g_program, "model"), 1, GL_FALSE, glm::value_ptr(modelMatrixMars));
+
+    glUniform1i(glGetUniformLocation(g_program, "isSun"), 0); 
+
+    glActiveTexture(GL_TEXTURE0); 
+    glBindTexture(GL_TEXTURE_2D, g_marsTexID);
+
+    sphereMesh->render();
+
+    glUniformMatrix4fv(glGetUniformLocation(g_program, "model"), 1, GL_FALSE, glm::value_ptr(modelMatrixVenus));
+
+    glUniform1i(glGetUniformLocation(g_program, "isSun"), 0); 
+
+    glActiveTexture(GL_TEXTURE0); 
+    glBindTexture(GL_TEXTURE_2D, g_venusTexID);
 
     sphereMesh->render();
 }  
@@ -453,35 +491,61 @@ void update(const float currentTimeInSec) {
     // std::cout << currentTimeInSec << std::endl;
 
     // Define the periods for Earth and Moon
-    const float T_rot = 10.0f; // Earth rotation period (adjust to suit)
+    const float T_rot = 10.0f; // Earth rotation period
     const float T_orbitEarth = 2 * T_rot; // Earth's orbital period
-    const float T_orbitMoon = 0.5f * T_rot; // Moon's orbital period (also its rotation period)
+    const float T_orbitMoon = 0.5f * T_rot; // Moon's orbital period (and rotation period)
 
-    // Calculate the Earth's position around the Sun
-    float earthOrbitAngle = 2.0f * M_PI * (currentTimeInSec / T_orbitEarth); // angle in radians
-    float earthPosX = kRadOrbitEarth * cos(earthOrbitAngle); // x position of Earth in orbit
-    float earthPosZ = kRadOrbitEarth * sin(earthOrbitAngle); // z position of Earth in orbit
+    // Orbital periods for Mars and Venus based on Earth's period
+    const float T_orbitMars = T_orbitEarth * (687.0f / 365.25f); // Mars's orbital period
+    const float T_orbitVenus = T_orbitEarth * (225.0f / 365.25f); // Venus's orbital period
 
-    // Calculate the Earth's rotation around its axis
-    float earthRotationAngle = 2.0f * M_PI * (currentTimeInSec / T_rot); // angle in radians
+    // Calculate Earth's position and rotation around its axis
+    float earthOrbitAngle = 2.0f * M_PI * (currentTimeInSec / T_orbitEarth);
+    float earthPosX = kRadOrbitEarth * cos(earthOrbitAngle);
+    float earthPosZ = kRadOrbitEarth * sin(earthOrbitAngle);
+    float earthRotationAngle = 2.0f * M_PI * (currentTimeInSec / T_rot);
 
-    // Calculate the Moon's position around the Earth
-    float moonOrbitAngle = 2.0f * M_PI * (currentTimeInSec / T_orbitMoon); // angle in radians
-    float moonPosX = earthPosX + kRadOrbitMoon * cos(moonOrbitAngle); // x position of Moon in orbit
-    float moonPosZ = earthPosZ + kRadOrbitMoon * sin(moonOrbitAngle); // z position of Moon in orbit
-
-    // Calculate the Moon's rotation (same as its orbit angle to keep the same face towards Earth)
+    // Calculate Moon's position around the Earth
+    float moonOrbitAngle = 2.0f * M_PI * (currentTimeInSec / T_orbitMoon);
+    float moonPosX = earthPosX + kRadOrbitMoon * cos(moonOrbitAngle);
+    float moonPosZ = earthPosZ + kRadOrbitMoon * sin(moonOrbitAngle);
     float moonRotationAngle = moonOrbitAngle;
 
-    // Update model matrices (to be used in the render function)
+    // Calculate Mars's position around the Sun
+    float marsOrbitAngle = 2.0f * M_PI * (currentTimeInSec / T_orbitMars);
+    float marsPosX = kRadOrbitMars * cos(marsOrbitAngle);
+    float marsPosZ = kRadOrbitMars * sin(marsOrbitAngle);
+    float marsRotationAngle = 2.0f * M_PI * (currentTimeInSec / T_rot); // Mars's daily rotation
+
+    // Calculate Venus's position around the Sun
+    float venusOrbitAngle = 2.0f * M_PI * (currentTimeInSec / T_orbitVenus);
+    float venusPosX = kRadOrbitVenus * cos(venusOrbitAngle);
+    float venusPosZ = kRadOrbitVenus * sin(venusOrbitAngle);
+    float venusRotationAngle = 2.0f * M_PI * (currentTimeInSec / T_rot); // Venus's daily rotation (can adjust to be slower if needed)
+
+    // Update model matrices for Earth
     modelMatrixEarth = glm::translate(glm::mat4(1.0f), glm::vec3(earthPosX, 0.0f, earthPosZ));
-    modelMatrixEarth = glm::rotate(modelMatrixEarth, glm::radians(23.5f), glm::vec3(1.0f, 0.0f, 0.0f)); // tilt rotation
+    modelMatrixEarth = glm::rotate(modelMatrixEarth, glm::radians(23.5f), glm::vec3(1.0f, 0.0f, 0.0f));
     modelMatrixEarth = glm::rotate(modelMatrixEarth, earthRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
     modelMatrixEarth = glm::scale(modelMatrixEarth, glm::vec3(kSizeEarth));
 
+    // Update model matrices for Moon
     modelMatrixMoon = glm::translate(glm::mat4(1.0f), glm::vec3(moonPosX, 0.0f, moonPosZ));
     modelMatrixMoon = glm::rotate(modelMatrixMoon, moonRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
     modelMatrixMoon = glm::scale(modelMatrixMoon, glm::vec3(kSizeMoon));
+
+    // Update model matrices for Mars
+    modelMatrixMars = glm::translate(glm::mat4(1.0f), glm::vec3(marsPosX, 0.0f, marsPosZ));
+    modelMatrixMars = glm::rotate(modelMatrixMars, glm::radians(25.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // Mars has a 25° tilt
+    modelMatrixMars = glm::rotate(modelMatrixMars, marsRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+    modelMatrixMars = glm::scale(modelMatrixMars, glm::vec3(kSizeMars));
+
+    // Update model matrices for Venus
+    modelMatrixVenus = glm::translate(glm::mat4(1.0f), glm::vec3(venusPosX, 0.0f, venusPosZ));
+    modelMatrixVenus = glm::rotate(modelMatrixVenus, glm::radians(177.4f), glm::vec3(1.0f, 0.0f, 0.0f)); // Venus has a 177.4° tilt (almost upside down)
+    modelMatrixVenus = glm::rotate(modelMatrixVenus, venusRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+    modelMatrixVenus = glm::scale(modelMatrixVenus, glm::vec3(kSizeVenus));
+
 }
 
 
