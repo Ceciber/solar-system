@@ -85,6 +85,11 @@ glm::mat4 modelMatrixMoon = glm::mat4(1.0f);
 glm::mat4 modelMatrixMars = glm::mat4(1.0f);
 glm::mat4 modelMatrixVenus = glm::mat4(1.0f);
 
+
+// add variables for camera rotation
+float orbitRadius = 10.0f;  // Distance from the planets
+float orbitAngle = 0.0f;    // Angle around the planets
+
 // Basic camera model
 class Camera {
 public:
@@ -141,13 +146,6 @@ GLuint loadTextureFromFileToGPU(const std::string &filename) {
   return texID;
 }
 
-void checkOpenGLError(const std::string& message) {
-    GLenum err;
-    while ((err = glGetError()) != GL_NO_ERROR) {
-        std::cerr << "OpenGL error (" << message << "): " << err << std::endl;
-    }
-}
-
 // Executed each time the window is resized. Adjust the aspect ratio and the rendering viewport to the current window.
 void windowSizeCallback(GLFWwindow* window, int width, int height) {
   g_camera.setAspectRatio(static_cast<float>(width)/static_cast<float>(height));
@@ -155,18 +153,46 @@ void windowSizeCallback(GLFWwindow* window, int width, int height) {
 }
 
 void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    static float orbitAngle = 0.1f;    // Horizontal angle of orbit
+    static float orbitRadius = 25.0f;  // Default orbit distance (must match initial position)
+    static const float angleIncrement = 0.05f;  // Speed of orbit rotation in radians
+    static const float radiusIncrement = 0.1f;  // Speed of zooming in/out
+
     if (action == GLFW_PRESS && key == GLFW_KEY_W) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
     } else if (action == GLFW_PRESS && key == GLFW_KEY_F) {
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     } else if (action == GLFW_PRESS && (key == GLFW_KEY_ESCAPE || key == GLFW_KEY_Q)) {
         glfwSetWindowShouldClose(window, true); // Closes the application if the escape key is pressed
-    } else if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_UP) {
-        const glm::vec3 camPosition = g_camera.getPosition();
-        g_camera.setPosition(glm::vec3(camPosition[0], camPosition[1], camPosition[2] - 0.1));
-    } else if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_DOWN) {
-        const glm::vec3 camPosition = g_camera.getPosition();
-        g_camera.setPosition(glm::vec3(camPosition[0], camPosition[1], camPosition[2] + 0.1));
+    }
+
+    // Orbit control (LEFT/RIGHT for angle adjustment, UP/DOWN for radius adjustment)
+    if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+        bool cameraUpdated = false; // Flag to check if camera position is updated
+
+        // Orbit control (LEFT/RIGHT for angle adjustment, UP/DOWN for radius adjustment)
+        if (key == GLFW_KEY_LEFT) {
+            orbitAngle -= angleIncrement; // Rotate orbit left
+            cameraUpdated = true;
+        } else if (key == GLFW_KEY_RIGHT) {
+            orbitAngle += angleIncrement; // Rotate orbit right
+            cameraUpdated = true;
+        } 
+
+        if (key == GLFW_KEY_UP) {
+            orbitRadius = glm::max(orbitRadius - radiusIncrement, 1.0f); // Zoom in
+            cameraUpdated = true;
+        } else if (key == GLFW_KEY_DOWN) {
+            orbitRadius += radiusIncrement; // Zoom out
+            cameraUpdated = true;
+        }
+
+        // Update the camera position based on orbit angle and radius if it was changed
+        if (cameraUpdated) {
+            float camX = orbitRadius * cos(orbitAngle);
+            float camZ = orbitRadius * sin(orbitAngle);
+            g_camera.setPosition(glm::vec3(camX, g_camera.getPosition().y, camZ));
+        }
     }
 }
 
@@ -258,8 +284,6 @@ void loadShader(GLuint program, GLenum type, const std::string &shaderFilename) 
         std::cerr << "ERROR in compiling " << shaderFilename << "\n\t" << infoLog << std::endl;
     }
 
-    checkOpenGLError("Shader attach");
-
     glAttachShader(program, shader);
     glDeleteShader(shader);
 }
@@ -275,14 +299,8 @@ void initGPUprogram() {
   GLint success;
   GLchar infoLog[512];
   glGetProgramiv(g_program, GL_LINK_STATUS, &success);
-  if(!success) {
-      glGetProgramInfoLog(g_program, 512, NULL, infoLog);
-      std::cerr << "ERROR: Shader program linking failed\n" << infoLog << std::endl;
-  }
-  checkOpenGLError("Program linking"); // Error check after linking
 
   glUseProgram(g_program);
-  checkOpenGLError("Program use"); // Error check after linking
 
   g_earthTexID = loadTextureFromFileToGPU("D:\\IGR\\TP00-OpenGL\\src\\media\\earth.jpg");
   g_moonTexID = loadTextureFromFileToGPU("D:\\IGR\\TP00-OpenGL\\src\\media\\moon.jpg");
@@ -290,7 +308,6 @@ void initGPUprogram() {
   g_marsTexID = loadTextureFromFileToGPU("D:\\IGR\\TP00-OpenGL\\src\\media\\mars.jpg");
   g_venusTexID = loadTextureFromFileToGPU("D:\\IGR\\TP00-OpenGL\\src\\media\\venus.jpg");
   glUniform1i(glGetUniformLocation(g_program, "material.albedoTex"), 0);
-  checkOpenGLError("Uniform setup"); // Error check after setting uniform
 }
 
 // Define your mesh(es) in the CPU memory
