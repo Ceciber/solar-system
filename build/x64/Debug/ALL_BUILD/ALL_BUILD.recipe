@@ -2,13 +2,13 @@
 <Project>
   <ProjectOutputs>
     <ProjectOutput>
-      <FullPath>D:\IGR\TP00-OpenGL\build\x64\Debug\ZERO_CHECK</FullPath>
+      <FullPath>D:\IGR\TP00-OpenGL\build\x64\debug\ZERO_CHECK</FullPath>
     </ProjectOutput>
     <ProjectOutput>
       <FullPath>D:\IGR\TP00-OpenGL\build\Debug\tpOpenGL.exe</FullPath>
     </ProjectOutput>
     <ProjectOutput>
-      <FullPath>D:\IGR\TP00-OpenGL\build\x64\Debug\ALL_BUILD</FullPath>
+      <FullPath>D:\IGR\TP00-OpenGL\build\x64\debug\ALL_BUILD</FullPath>
     </ProjectOutput>
   </ProjectOutputs>
   <ContentFiles />

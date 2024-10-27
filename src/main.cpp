@@ -44,10 +44,10 @@ const static float kSizeMoon = 0.25;
 const static float kRadOrbitEarth = 10;
 const static float kRadOrbitMoon = 2;
 // add two planets for final step
-const static float kSizeMars = kSizeEarth * 0.53f;  // Mars is 53% of Earth's size
-const static float kSizeVenus = kSizeEarth * 0.95f; // Venus is 95% of Earth's size
-const static float kRadOrbitMars = kRadOrbitEarth * 1.52f;
-const static float kRadOrbitVenus = kRadOrbitEarth * 1.52f;
+const static float kSizeMars = 0.25; //about half the earth size
+const static float kSizeVenus = 0.49; //slightly smaller than the earth
+const static float kRadOrbitMars = 15; //about 1.5 earth orbit
+const static float kRadOrbitVenus = 7.2; //abot 7.2 earth orbit
 
 // Window parameters
 GLFWwindow *g_window = nullptr;
@@ -386,10 +386,9 @@ void init() {
   initGLFW();
   initOpenGL();
 
-  /* uncomment for triangle 
+  /*uncomment for triangle
   initCPUgeometry();
-  initGPUgeometry();
-  */
+  initGPUgeometry(); */
 
   sphereMesh = Mesh::genSphere(32);   // Crea la mesh per il Sole
 
@@ -490,61 +489,47 @@ void render() {
 void update(const float currentTimeInSec) {
     // std::cout << currentTimeInSec << std::endl;
 
-    // Define the periods for Earth and Moon
-    const float T_rot = 10.0f; // Earth rotation period
-    const float T_orbitEarth = 2 * T_rot; // Earth's orbital period
-    const float T_orbitMoon = 0.5f * T_rot; // Moon's orbital period (and rotation period)
+    float earthRotationSpeed = 1.0f;  // Full rotation of Earth in arbitrary units (1 rotation per unit time)
+    float earthOrbitSpeed = 0.5f * earthRotationSpeed;  // Earth's orbital speed (2 times slower than rotation)
+    float moonOrbitSpeed = 2.0f * earthRotationSpeed;  // Moon orbits twice as fast as Earth's rotation
+    float moonRotationSpeed = moonOrbitSpeed;  // Moon's rotation is synchronous with its orbit
 
-    // Orbital periods for Mars and Venus based on Earth's period
-    const float T_orbitMars = T_orbitEarth * (687.0f / 365.25f); // Mars's orbital period
-    const float T_orbitVenus = T_orbitEarth * (225.0f / 365.25f); // Venus's orbital period
+    // Mars and Venus orbit speeds relative to Earth's
+    float marsOrbitSpeed = 0.32f * earthOrbitSpeed;   // Mars orbits more slowly than Earth (687 days vs. 365)
+    float venusOrbitSpeed = 1.5f * earthOrbitSpeed;   // Venus orbits faster than Earth (225 days vs. 365)
 
-    // Calculate Earth's position and rotation around its axis
-    float earthOrbitAngle = 2.0f * M_PI * (currentTimeInSec / T_orbitEarth);
-    float earthPosX = kRadOrbitEarth * cos(earthOrbitAngle);
-    float earthPosZ = kRadOrbitEarth * sin(earthOrbitAngle);
-    float earthRotationAngle = 2.0f * M_PI * (currentTimeInSec / T_rot);
+    modelMatrixEarth = glm::mat4(1.0f);
 
-    // Calculate Moon's position around the Earth
-    float moonOrbitAngle = 2.0f * M_PI * (currentTimeInSec / T_orbitMoon);
-    float moonPosX = earthPosX + kRadOrbitMoon * cos(moonOrbitAngle);
-    float moonPosZ = earthPosZ + kRadOrbitMoon * sin(moonOrbitAngle);
-    float moonRotationAngle = moonOrbitAngle;
+    glm::mat4 earthTranslate = glm::translate(glm::mat4(1.0f), glm::vec3(kRadOrbitEarth * cos(0.3f * currentTimeInSec), 0.0f, kRadOrbitEarth * sin(0.3f * currentTimeInSec)));
+    glm::mat4 earthScale = glm::scale(glm::mat4(1.0f), glm::vec3(kSizeEarth));
+    glm::mat4 earthRotate = glm::rotate(glm::mat4(1.0f), 0.6f * currentTimeInSec, glm::vec3(sin(glm::radians(23.5)), cos(glm::radians(23.5)), 0.0f));
+    modelMatrixEarth = earthTranslate * earthScale * earthRotate;
 
-    // Calculate Mars's position around the Sun
-    float marsOrbitAngle = 2.0f * M_PI * (currentTimeInSec / T_orbitMars);
-    float marsPosX = kRadOrbitMars * cos(marsOrbitAngle);
-    float marsPosZ = kRadOrbitMars * sin(marsOrbitAngle);
-    float marsRotationAngle = 2.0f * M_PI * (currentTimeInSec / T_rot); // Mars's daily rotation
+    modelMatrixMoon = glm::mat4(1.0f); // Reset Moon matrix
 
-    // Calculate Venus's position around the Sun
-    float venusOrbitAngle = 2.0f * M_PI * (currentTimeInSec / T_orbitVenus);
-    float venusPosX = kRadOrbitVenus * cos(venusOrbitAngle);
-    float venusPosZ = kRadOrbitVenus * sin(venusOrbitAngle);
-    float venusRotationAngle = 2.0f * M_PI * (currentTimeInSec / T_rot); // Venus's daily rotation (can adjust to be slower if needed)
+    // transformations for the moon
+    glm::mat4 moonTranslate = glm::translate(glm::mat4(1.0f), glm::vec3(kRadOrbitMoon * cos(0.6 * currentTimeInSec), 0.0f, kRadOrbitMoon * sin(0.6 * currentTimeInSec)));
+    glm::mat4 moonRotate = glm::rotate(glm::mat4(1.0f), 0.6f * currentTimeInSec, glm::vec3(0, 1, 0.0f));
+    glm::mat4 moonScale = glm::scale(glm::mat4(1.0f), glm::vec3(kSizeMoon));
+    modelMatrixMoon = earthTranslate * moonTranslate * moonRotate * moonScale;
 
-    // Update model matrices for Earth
-    modelMatrixEarth = glm::translate(glm::mat4(1.0f), glm::vec3(earthPosX, 0.0f, earthPosZ));
-    modelMatrixEarth = glm::rotate(modelMatrixEarth, glm::radians(23.5f), glm::vec3(1.0f, 0.0f, 0.0f));
-    modelMatrixEarth = glm::rotate(modelMatrixEarth, earthRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
-    modelMatrixEarth = glm::scale(modelMatrixEarth, glm::vec3(kSizeEarth));
+    // Reset Mars model matrix
+    modelMatrixMars = glm::mat4(1.0f);
 
-    // Update model matrices for Moon
-    modelMatrixMoon = glm::translate(glm::mat4(1.0f), glm::vec3(moonPosX, 0.0f, moonPosZ));
-    modelMatrixMoon = glm::rotate(modelMatrixMoon, moonRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
-    modelMatrixMoon = glm::scale(modelMatrixMoon, glm::vec3(kSizeMoon));
+    // Transformations for Mars
+    glm::mat4 marsTranslate = glm::translate(glm::mat4(1.0f), glm::vec3(kRadOrbitMars * cos(marsOrbitSpeed * currentTimeInSec), 0.0f, kRadOrbitMars * sin(marsOrbitSpeed * currentTimeInSec)));
+    glm::mat4 marsRotate = glm::rotate(glm::mat4(1.0f), earthRotationSpeed * currentTimeInSec, glm::vec3(0.0f, 1.0f, 0.0f));  // Mars rotating on its axis
+    glm::mat4 marsScale = glm::scale(glm::mat4(1.0f), glm::vec3(kSizeMars));
+    modelMatrixMars = marsTranslate * marsRotate * marsScale;  
 
-    // Update model matrices for Mars
-    modelMatrixMars = glm::translate(glm::mat4(1.0f), glm::vec3(marsPosX, 0.0f, marsPosZ));
-    modelMatrixMars = glm::rotate(modelMatrixMars, glm::radians(25.0f), glm::vec3(1.0f, 0.0f, 0.0f)); // Mars has a 25° tilt
-    modelMatrixMars = glm::rotate(modelMatrixMars, marsRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
-    modelMatrixMars = glm::scale(modelMatrixMars, glm::vec3(kSizeMars));
+    // Reset Venus model matrix
+    modelMatrixVenus = glm::mat4(1.0f);
 
-    // Update model matrices for Venus
-    modelMatrixVenus = glm::translate(glm::mat4(1.0f), glm::vec3(venusPosX, 0.0f, venusPosZ));
-    modelMatrixVenus = glm::rotate(modelMatrixVenus, glm::radians(177.4f), glm::vec3(1.0f, 0.0f, 0.0f)); // Venus has a 177.4° tilt (almost upside down)
-    modelMatrixVenus = glm::rotate(modelMatrixVenus, venusRotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
-    modelMatrixVenus = glm::scale(modelMatrixVenus, glm::vec3(kSizeVenus));
+    // Transformations for Venus
+    glm::mat4 venusTranslate = glm::translate(glm::mat4(1.0f), glm::vec3(kRadOrbitVenus * cos(venusOrbitSpeed * currentTimeInSec), 0.0f, kRadOrbitVenus * sin(venusOrbitSpeed * currentTimeInSec)));
+    glm::mat4 venusRotate = glm::rotate(glm::mat4(1.0f), -earthRotationSpeed * currentTimeInSec, glm::vec3(0.0f, 1.0f, 0.0f));  // Venus rotating in the opposite direction (retrograde)
+    glm::mat4 venusScale = glm::scale(glm::mat4(1.0f), glm::vec3(kSizeVenus));
+    modelMatrixVenus = venusTranslate * venusRotate * venusScale; 
 
 }
 
